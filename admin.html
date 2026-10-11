@@ -436,7 +436,7 @@ tr:hover td{background:rgba(0,0,0,0.02);}
   </div>
   <div class="tc">
     <div class="th"><div class="tt">Total <span id="b-count">0</span> Banners</div></div>
-    <table><thead><tr><th>#</th><th>Preview</th><th>Title</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
+    <table><thead><tr><th>#</th><th>Preview</th><th>Title</th><th>Position</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
     <tbody id="b-tb"></tbody></table>
     <div class="es" id="b-empty"><div class="ei">🖼️</div>No banners yet — add করুন!</div>
   </div>
@@ -786,6 +786,13 @@ tr:hover td{background:rgba(0,0,0,0.02);}
   <div class="md" style="max-width:520px;">
     <button class="mc" onclick="cm('banner-modal')">✕</button>
     <div class="md-title" id="bm-title">Add Banner</div>
+    <div class="fg"><label>📍 কোথায় দেখাবে?</label>
+      <select id="b-pos" onchange="updateBannerHint()">
+        <option value="top">উপরের বড় Slider</option>
+        <option value="side">উপরে ডান পাশে (ছোট banner — শুধু computer-এ দেখায়)</option>
+        <option value="middle">মাঝে — scroll করার পথে Offer Banner</option>
+      </select>
+    </div>
     <div class="fg"><label>Banner Type</label>
       <select id="b-type" onchange="toggleBannerType(this.value)">
         <option value="gradient">Gradient (Color)</option>
@@ -810,11 +817,12 @@ tr:hover td{background:rgba(0,0,0,0.02);}
     <div id="b-image-wrap" style="display:none;">
       <label>Banner Images <span style="color:var(--muted);font-size:11px;">(সর্বোচ্চ ৪টা — একই banner-এ আপনাআপনি ঘুরে দেখাবে)</span></label>
       <div id="b-img-slots" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;"></div>
-      <div style="margin-top:6px;margin-bottom:10px;font-size:11px;color:var(--muted);">💡 ব্যানার ছবি 1200×500 px (১২:৫ অনুপাত) দিলে সবচেয়ে ভালো দেখাবে — আপনার Googwi banner (960×400) ঠিক এই মাপের।</div>
+      <div id="b-size-hint" style="margin-top:6px;margin-bottom:10px;font-size:11px;color:var(--muted);"></div>
     </div>
     <div id="b-video-wrap" style="display:none;">
       <div class="fg"><label>Video URL (YouTube)</label><input type="text" id="b-vid" placeholder="https://youtube.com/watch?v=..."></div>
     </div>
+    <div class="fg"><label>🔗 ক্লিক করলে কোন Category খুলবে? <span style="color:var(--muted);font-size:11px;">(ঐচ্ছিক)</span></label><select id="b-link"><option value="">— কিছু না (শুধু পণ্যের দিকে scroll) —</option></select></div>
     <div class="fg"><label>Status</label><select id="b-st"><option>Active</option><option>Inactive</option></select></div>
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button class="btn btn-p" onclick="saveBanner()" style="flex:1;">💾 Save Banner</button>
@@ -2354,7 +2362,26 @@ function delCourier(id){ if(!confirm('Delete?')) return; couriers=couriers.filte
 const MAX_BANNER_IMAGES = 4;
 let bImages = [];
 
+const BANNER_POS_LABEL = {top:'উপরে Slider', side:'ডান পাশে', middle:'মাঝে (Offer)'};
+const BANNER_SIZE_HINT = {
+  top:'💡 উপরের Slider: 1200×500 px (১২:৫) — আপনার Googwi banner (960×400) ঠিক এই মাপের।',
+  side:'💡 ডান পাশের banner: প্রায় 600×550 px (প্রায় চারকোনা)। শুধু computer/laptop-এ দেখায়, mobile-এ লুকানো থাকে।',
+  middle:'💡 মাঝের Offer banner: 1200×400 px (৩:১)। প্রথম category সারির পর দেখাবে, একাধিক দিলে প্রতি ২টা সারি পরপর একটা করে।'
+};
+function updateBannerHint(){
+  const pos=document.getElementById('b-pos').value;
+  document.getElementById('b-size-hint').textContent=BANNER_SIZE_HINT[pos]||'';
+}
+function fillBannerLinkOptions(selected){
+  const sel=document.getElementById('b-link');
+  sel.innerHTML='<option value="">— কিছু না (শুধু পণ্যের দিকে scroll) —</option>'+categories.map(c=>`<option>${c.name}</option>`).join('');
+  sel.value=selected||'';
+}
+
 function resetBF(){
+  document.getElementById('b-pos').value='top';
+  fillBannerLinkOptions('');
+  updateBannerHint();
   document.getElementById('b-type').value='image';
   document.getElementById('b-text').value='';
   document.getElementById('b-sub').value='';
@@ -2414,7 +2441,8 @@ function handleBannerImgUpload(input,slotIdx){
 
 function saveBanner(){
   const type=document.getElementById('b-type').value;
-  const data={type,text:document.getElementById('b-text').value,sub:document.getElementById('b-sub').value,status:document.getElementById('b-st').value};
+  const data={type,text:document.getElementById('b-text').value,sub:document.getElementById('b-sub').value,status:document.getElementById('b-st').value,
+    position:document.getElementById('b-pos').value,link:document.getElementById('b-link').value};
   if(type==='gradient') data.bg=document.getElementById('b-bg').value;
   if(type==='image'){
     const images = bImages.filter(Boolean);
@@ -2443,7 +2471,8 @@ function renderBanners(){
         b.type==='video'?`<div style="width:96px;height:40px;background:var(--surface);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--primary)">▶ Video</div>`:
         `<div style="width:96px;height:40px;border-radius:6px;background:${b.bg||'var(--surface)'};display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;padding:4px;text-align:center">${b.text||'Banner'}</div>`}
     </td>
-    <td style="font-weight:600">${b.text||'—'}</td>
+    <td style="font-weight:600">${b.text||'—'}${b.link?`<div style="font-size:11px;color:var(--muted);">🔗 ${b.link}</div>`:''}</td>
+    <td><span class="badge ${(b.position||'top')==='middle'?'Pending':'Processing'}">${BANNER_POS_LABEL[b.position||'top']}</span></td>
     <td><span class="badge Invoiced">${b.type}</span></td>
     <td><span class="badge ${b.status==='Active'?'Active':'Inactive'}">${b.status}</span></td>
     <td><div class="ci">
@@ -2456,6 +2485,9 @@ function renderBanners(){
 function editBanner(id){
   editB=banners.find(b=>b.id===id); if(!editB) return;
   document.getElementById('bm-title').textContent='Edit Banner';
+  document.getElementById('b-pos').value=editB.position||'top';
+  fillBannerLinkOptions(editB.link||'');
+  updateBannerHint();
   document.getElementById('b-type').value=editB.type;
   document.getElementById('b-text').value=editB.text||'';
   document.getElementById('b-sub').value=editB.sub||'';
