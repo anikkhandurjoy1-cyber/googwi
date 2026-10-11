@@ -153,6 +153,37 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .hs-contact .hs-big{font-family:var(--head);font-weight:800;font-size:22px;}
 .hs-contact a{color:#fff;text-decoration:none;}
 
+/* side banner (admin "উপরে ডান পাশে") + default promo card */
+.hs-banner{flex:1;position:relative;overflow:hidden;background-size:cover;background-position:center;background-repeat:no-repeat;background-color:#fff;display:flex;align-items:flex-end;}
+.hs-btext{position:relative;z-index:2;width:100%;padding:18px 16px 16px;background:linear-gradient(0deg,rgba(0,0,0,.65),transparent);color:#fff;}
+.hs-btitle{font-family:var(--head);font-weight:700;font-size:19px;line-height:1.2;}
+.hs-bsub{font-size:13px;opacity:.92;margin-top:3px;}
+.hs-promo{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;padding:20px 18px;color:#fff;background:radial-gradient(120% 90% at 100% 0%,#FF8A3D 0%,#FF4A00 45%,#C93A00 100%);}
+.hs-promo::before{content:'';position:absolute;width:220px;height:220px;right:-70px;top:-70px;border-radius:50%;background:rgba(255,255,255,.12);}
+.hs-promo::after{content:'';position:absolute;width:150px;height:150px;left:-50px;bottom:-60px;border-radius:50%;background:rgba(255,255,255,.08);}
+.hs-promo>*{position:relative;z-index:1;}
+.hsp-top{display:flex;align-items:center;gap:10px;}
+.hsp-mark{width:46px;height:46px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 16px -8px rgba(0,0,0,.4);}
+.hsp-mark svg{width:34px;height:34px;}
+.hsp-eyebrow{font-size:11.5px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;opacity:.85;}
+.hsp-name{font-family:var(--head);font-weight:800;font-size:22px;line-height:1;}
+.hsp-title{font-family:var(--head);font-weight:700;font-size:21px;line-height:1.3;margin:12px 0 10px;}
+.hsp-perks{list-style:none;display:grid;gap:7px;font-size:13.5px;font-weight:600;}
+.hsp-perks li{display:flex;align-items:center;gap:8px;}
+.hsp-perks li span{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.hsp-acts{display:flex;gap:8px;margin-top:14px;}
+.hsp-acts a{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-weight:700;font-size:13px;padding:9px 6px;border-radius:10px;}
+.hsp-call{background:#fff;color:var(--primary);}
+.hsp-wa{background:rgba(0,0,0,.18);color:#fff;border:1px solid rgba(255,255,255,.35);}
+.hsp-wa svg{width:16px;height:16px;fill:#fff;}
+
+/* MIDDLE OFFER BANNER (admin "মাঝে") */
+.mid-banner{position:relative;display:flex;align-items:center;overflow:hidden;aspect-ratio:3/1;border-radius:16px;background-size:cover;background-position:center;background-repeat:no-repeat;background-color:#fff;box-shadow:0 16px 30px -22px rgba(0,0,0,.45);}
+.mid-banner.no-text .banner-slide-overlay{display:none;}
+.mid-banner .b-content{max-width:62%;}
+.clickable{cursor:pointer;}
+@media(hover:hover){.mid-banner.clickable:hover,.hs-banner.clickable:hover{filter:brightness(1.03);}}
+
 /* TRUST STRIP */
 .trust{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px;}
 @media(min-width:800px){.trust{grid-template-columns:repeat(4,1fr);}}
@@ -795,8 +826,42 @@ function setArrows(show){
   document.querySelector('.banner-next').style.display=show?'flex':'none';
 }
 
+// Banner position set in admin: top (big slider), side (right of slider), middle (between product rows)
+function bannerPos(b){ return b.position || 'top'; }
+function activeBannersAt(pos){ return banners.filter(b=>b.status==='Active' && bannerPos(b)===pos); }
+function bannerMedia(b,w){
+  const imgs = (b.images && b.images.length) ? b.images : (b.url ? [b.url] : []);
+  if(b.type==='image' && imgs.length){
+    if(imgs.length===1) return {style:`background-image:url('${cld(imgs[0],w)}');`, media:''};
+    return {style:'', media:`<div class="banner-mini-slideshow">${imgs.map((url,j)=>`<div class="bms-layer${j===0?' active':''}" style="background-image:url('${cld(url,w)}');"></div>`).join('')}</div>`};
+  }
+  if(b.type==='video' && b.videoUrl){
+    const v = b.videoUrl.replace('watch?v=','embed/').replace('youtu.be/','www.youtube.com/embed/');
+    return {style:'', media:`<iframe src="${v}" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allowfullscreen></iframe>`};
+  }
+  return {style:`background:${b.bg || 'linear-gradient(120deg,#FF4A00,#FF7A2F)'};`, media:''};
+}
+// a banner with a linked category opens that category when tapped
+function bannerLinkAttr(b){ return b.link ? ` data-blink="${escAttr(b.link)}"` : ''; }
+function bannerCta(b,label){
+  return b.link ? `<button class="cta-btn"${bannerLinkAttr(b)}>${label}</button>`
+                : `<button class="cta-btn" onclick="scrollToProducts()">${label}</button>`;
+}
+function openBannerLink(cat){
+  if(!cat) return;
+  if(categories.some(c=>c.name===cat)){
+    filterCat(cat);
+    document.getElementById('shop-section').scrollIntoView({behavior:'smooth',block:'start'});
+  } else scrollToProducts();
+}
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-blink]');
+  if(!el || e.target.closest('a,iframe')) return;
+  openBannerLink(el.dataset.blink);
+});
+
 function renderCustomerBanners(){
-  const activeBanners = banners.filter(b=>b.status==='Active');
+  const activeBanners = activeBannersAt('top');
   const slidesWrap = document.getElementById('banner-slides');
   const dotsWrap = document.getElementById('banner-dots');
   if(bannerTimer) clearInterval(bannerTimer);
@@ -820,31 +885,15 @@ function renderCustomerBanners(){
   }
 
   slidesWrap.innerHTML = activeBanners.map((b,i)=>{
-    let bg = '';
-    let mediaHtml = '';
-    const imgs = (b.images && b.images.length) ? b.images : (b.url ? [b.url] : []);
-    if(b.type==='image' && imgs.length){
-      if(imgs.length===1){
-        bg = `background-image:url('${cld(imgs[0],1600)}');`;
-      } else {
-        mediaHtml = `<div class="banner-mini-slideshow">
-          ${imgs.map((url,j)=>`<div class="bms-layer${j===0?' active':''}" style="background-image:url('${cld(url,1600)}');"></div>`).join('')}
-        </div>`;
-      }
-    } else if(b.type==='video' && b.videoUrl){
-      const v = b.videoUrl.replace('watch?v=','embed/').replace('youtu.be/','www.youtube.com/embed/');
-      mediaHtml = `<iframe src="${v}" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allowfullscreen></iframe>`;
-    } else {
-      bg = `background:${b.bg || 'linear-gradient(120deg,#FF4A00,#FF7A2F)'};`;
-    }
+    const m = bannerMedia(b,1600);
     const hasText = !!(b.text || b.sub);
-    return `<div class="banner-slide${hasText?'':' no-text'}" data-i="${i}" style="${bg}">
+    return `<div class="banner-slide${hasText?'':' no-text'}${b.link?' clickable':''}" data-i="${i}" style="${m.style}"${bannerLinkAttr(b)}>
       <div class="banner-slide-overlay"></div>
-      ${mediaHtml}
+      ${m.media}
       <div class="b-content">
         ${b.text?`<div class="b-title">${b.text}</div>`:''}
         ${b.sub?`<div class="b-sub">${b.sub}</div>`:''}
-        ${hasText?`<button class="cta-btn" onclick="scrollToProducts()">এখনই কিনুন →</button>`:''}
+        ${hasText?bannerCta(b,'এখনই কিনুন →'):''}
       </div>
     </div>`;
   }).join('');
@@ -872,7 +921,7 @@ function startBannerMiniSlideshows(){
       layers[idx].classList.remove('active');
       idx = (idx+1) % layers.length;
       layers[idx].classList.add('active');
-    }, 2500);
+    }, 2000);
     bannerMiniTimers.push(timer);
   });
 }
@@ -899,29 +948,34 @@ function slideBanner(d){
   if(TOTAL_BANNERS>1){ bannerTimer=setInterval(()=>goBanner(bannerIdx+1),4500); }
 }
 
-// Right-side hero card: today's best offer (or contact card when no offers yet)
+// Right of the main slider: admin "উপরে ডান পাশে" banner, otherwise a Googwi promo card
 function renderHeroSide(){
   const box=document.getElementById('hero-side'); if(!box) return;
-  const p=getBestOfferProduct();
-  if(p){
-    const img=productThumb(p,500);
-    box.innerHTML=`<div class="hs-card" onclick="openDetail('${p._docId}')">
-      <span class="hs-tag">🔥 আজকের সেরা অফার</span>
-      <div class="hs-imgbox">${img?`<img src="${img}" alt="${escAttr(p.name)}" decoding="async">`:'<span style="font-size:48px">📦</span>'}<span class="hs-off">Save ${discOf(p)}%</span></div>
-      <div class="hs-name">${escAttr(p.name)}</div>
-      <div class="hs-row"><span class="hs-price">৳${priceOf(p).toLocaleString()}<s>৳${(p.regular||0).toLocaleString()}</s></span>
-      <button class="hs-btn" onclick="event.stopPropagation();openOrderModal('${p._docId}')">অর্ডার করুন</button></div>
+  const side=activeBannersAt('side');
+  if(side.length){
+    const b=side[0], m=bannerMedia(b,900);
+    box.innerHTML=`<div class="hs-banner${b.link?' clickable':''}" style="${m.style}"${bannerLinkAttr(b)}>${m.media}
+      ${(b.text||b.sub)?`<div class="hs-btext">${b.text?`<div class="hs-btitle">${b.text}</div>`:''}${b.sub?`<div class="hs-bsub">${b.sub}</div>`:''}</div>`:''}
     </div>`;
-  } else {
-    const ph=callNumber();
-    box.innerHTML=`<div class="hs-card hs-contact">
-      <div style="font-size:40px;">📞</div>
-      <div style="font-weight:700;font-size:15px;">অর্ডার করতে কল করুন</div>
-      <a class="hs-big" href="tel:${ph}">${ph}</a>
-      <div style="font-size:13px;opacity:.9;">অথবা WhatsApp করুন</div>
-      <a class="hs-btn" style="align-self:center;text-decoration:none;color:var(--primary)" href="${waLink('আসসালামু আলাইকুম, Googwi থেকে অর্ডার করতে চাই।')}" target="_blank" rel="noopener">💬 ${(settings && settings.wa) || SHOP_WA_DEFAULT}</a>
-    </div>`;
+    startBannerMiniSlideshows();
+    return;
   }
+  const ph=callNumber();
+  box.innerHTML=`<div class="hs-promo">
+    <div>
+      <div class="hsp-top"><div class="hsp-mark">${gMark('')}</div><div><div class="hsp-eyebrow">Gadget Shop</div><div class="hsp-name">Googwi</div></div></div>
+      <div class="hsp-title">নিত্য প্রয়োজনীয় সব গ্যাজেট — এক জায়গায়</div>
+      <ul class="hsp-perks">
+        <li><span>✓</span>100% অরিজিনাল প্রোডাক্ট</li>
+        <li><span>✓</span>পণ্য হাতে পেয়ে টাকা দিন</li>
+        <li><span>✓</span>দ্রুত ডেলিভারি সারাদেশে</li>
+      </ul>
+    </div>
+    <div class="hsp-acts">
+      <a class="hsp-call" href="tel:${ph}">📞 কল করুন</a>
+      <a class="hsp-wa" href="${waLink('আসসালামু আলাইকুম, Googwi থেকে অর্ডার করতে চাই।')}" target="_blank" rel="noopener">${WA_ICON} WhatsApp</a>
+    </div>
+  </div>`;
 }
 
 // ══════════════════════════════════
@@ -1248,11 +1302,21 @@ function renderTopSelling(){
   }).join('');
 }
 
-// One horizontal row per active category
+function midBannerHTML(b){
+  const m=bannerMedia(b,1600);
+  const hasText=!!(b.text||b.sub);
+  return `<section class="wrap sec"><div class="mid-banner${hasText?'':' no-text'}${b.link?' clickable':''}" style="${m.style}"${bannerLinkAttr(b)}>
+    <div class="banner-slide-overlay"></div>
+    ${m.media}
+    ${hasText?`<div class="b-content">${b.text?`<div class="b-title">${b.text}</div>`:''}${b.sub?`<div class="b-sub">${b.sub}</div>`:''}${bannerCta(b,'অফার দেখুন →')}</div>`:''}
+  </div></section>`;
+}
+
+// One horizontal row per active category, with the "মাঝে" offer banners placed between rows
 function renderCatRows(){
   const wrap=document.getElementById('cat-rows');
   const live=liveProducts();
-  wrap.innerHTML=activeCats().map(c=>{
+  const rows=activeCats().map(c=>{
     const list=live.filter(p=>prodInCat(p,c.name));
     if(!list.length) return '';
     return `<section class="wrap sec prow">
@@ -1260,8 +1324,17 @@ function renderCatRows(){
       <button type="button" class="view-all" data-cat="${escAttr(c.name)}">VIEW ALL ITEMS →</button></div>
       <div class="row-scroll">${list.slice(0,12).map((p,i)=>productCardHTML(p,i+6)).join('')}</div>
     </section>`;
-  }).join('');
+  }).filter(Boolean);
+  const mids=activeBannersAt('middle');
+  let html='', mi=0;
+  rows.forEach((r,i)=>{
+    html+=r;
+    if(i%2===0 && mi<mids.length) html+=midBannerHTML(mids[mi++]);   // after row 1, 3, 5...
+  });
+  while(mi<mids.length) html+=midBannerHTML(mids[mi++]);
+  wrap.innerHTML=html;
   wrap.querySelectorAll('.view-all').forEach(b=>b.onclick=()=>{ filterCat(b.dataset.cat); document.getElementById('shop-section').scrollIntoView({behavior:'smooth',block:'start'}); });
+  startBannerMiniSlideshows();
 }
 
 function renderHome(){
@@ -1272,6 +1345,66 @@ function renderHome(){
   renderFooterCats();
   renderHeroSide();
   renderProducts();
+  scheduleImageWarmup();
+}
+
+// ══════════════════════════════════
+// AUTO-SLIDE — product rows & category circles move one card every 2s.
+// Pauses while the customer touches / hovers / scrolls a row; only rows on screen move.
+// ══════════════════════════════════
+const AUTO_SLIDE_MS = 2000;
+const AUTO_SLIDE_SEL = '.row-scroll, .fcats';
+function pauseAutoSlide(el,ms){ if(el) el._pauseUntil = Date.now() + ms; }
+['touchstart','mousedown','wheel'].forEach(ev=>document.addEventListener(ev,e=>{
+  pauseAutoSlide(e.target.closest && e.target.closest(AUTO_SLIDE_SEL), 6000);
+},{passive:true}));
+document.addEventListener('mouseover',e=>{
+  pauseAutoSlide(e.target.closest && e.target.closest(AUTO_SLIDE_SEL), 2500);
+},{passive:true});
+function autoSlideTick(){
+  if(document.hidden) return;
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if(document.querySelector('.mo.active')) return;          // a popup is open
+  const vh = window.innerHeight;
+  document.querySelectorAll(AUTO_SLIDE_SEL).forEach(el=>{
+    if(el.scrollWidth <= el.clientWidth + 4) return;          // nothing hidden to show
+    if(el._pauseUntil && Date.now() < el._pauseUntil) return;
+    const r = el.getBoundingClientRect();
+    if(r.bottom < 0 || r.top > vh || r.width === 0) return;   // off screen
+    const first = el.firstElementChild; if(!first) return;
+    const gap = parseFloat(getComputedStyle(el).columnGap) || 10;
+    const step = first.getBoundingClientRect().width + gap;
+    if(el.scrollLeft + el.clientWidth >= el.scrollWidth - 6) el.scrollTo({left:0, behavior:'smooth'});
+    else el.scrollBy({left:step, behavior:'smooth'});
+  });
+}
+setInterval(autoSlideTick, AUTO_SLIDE_MS);
+
+// ══════════════════════════════════
+// SPEED — download every product / category / banner image in the background
+// right after the page shows, so rows are already loaded before the customer scrolls.
+// ══════════════════════════════════
+const _warmed = new Set();
+let _warmTimer = null;
+function warmImage(url){
+  if(!url || _warmed.has(url)) return;
+  _warmed.add(url);
+  const im = new Image(); im.decoding = 'async'; im.src = url;
+}
+function scheduleImageWarmup(){
+  clearTimeout(_warmTimer);
+  _warmTimer = setTimeout(()=>{
+    const run = ()=>{
+      // banners first (they are big and visible), then categories, then products
+      banners.filter(b=>b.status==='Active').forEach(b=>{
+        const imgs=(b.images&&b.images.length)?b.images:(b.url?[b.url]:[]);
+        imgs.forEach(u=>warmImage(cld(u, bannerPos(b)==='side'?900:1600)));
+      });
+      activeCats().forEach(c=>warmImage(catImage(c)));
+      liveProducts().slice(0,120).forEach(p=>warmImage(productThumb(p,400)));
+    };
+    if('requestIdleCallback' in window) requestIdleCallback(run,{timeout:1500}); else run();
+  }, 300);
 }
 
 function renderProducts(){
