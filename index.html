@@ -48,7 +48,7 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .brand{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;}
 .brand-mark{width:40px;height:40px;display:block;}
 .brand-txt{display:flex;flex-direction:column;line-height:1;}
-.brand-name{font-family:var(--head);font-weight:800;font-size:25px;letter-spacing:-.6px;color:#111;}
+.brand-name{font-family:var(--head);font-weight:800;font-size:25px;letter-spacing:-.6px;color:var(--primary);}
 .brand-name b{color:var(--primary);font-weight:800;}
 .brand-tag{font-family:var(--head);font-size:8.5px;font-weight:700;letter-spacing:2.6px;color:var(--primary);margin-top:3px;}
 .brand-img{height:42px;max-width:180px;object-fit:contain;display:block;}
@@ -114,7 +114,7 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .gwb-head{display:flex;align-items:center;gap:clamp(6px,1.4vw,12px);margin-bottom:clamp(4px,1vw,10px);}
 .gwb-logo{width:clamp(36px,9vw,76px);height:clamp(36px,9vw,76px);border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 clamp(3px,.8vw,7px) #FFE1D2,0 10px 18px -8px rgba(255,74,0,.7);flex-shrink:0;}
 .gwb-logo svg{width:68%;height:68%;}
-.gwb-name{font-family:var(--head);font-weight:800;color:#111;font-size:clamp(24px,6.6vw,54px);letter-spacing:-1.2px;line-height:1;}
+.gwb-name{font-family:var(--head);font-weight:800;color:var(--primary);font-size:clamp(24px,6.6vw,54px);letter-spacing:-1.2px;line-height:1;}
 .gwb-sub{font-weight:700;font-size:clamp(11px,2.8vw,19px);line-height:1.35;color:#222;margin-bottom:clamp(6px,1.4vw,12px);}
 .gwb-sub span{color:var(--primary);}
 .gwb-stage{position:relative;z-index:3;width:42%;height:100%;flex-shrink:0;display:flex;align-items:center;justify-content:center;perspective:900px;margin-right:2%;}
@@ -441,7 +441,7 @@ footer{background:#fff;border-top:1px solid var(--border);margin-top:40px;paddin
 <header class="hdr"><div class="wrap hdr-in">
   <a class="brand" href="./" id="site-logo" aria-label="Googwi">
     <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#FF4A00" stroke-linecap="round"><path d="M73 30.7A30 30 0 1 0 80 50" stroke-width="18"/><path d="M80 51H52" stroke-width="14"/><path d="M53 46L49 36" stroke-width="10"/></g></svg>
-    <span class="brand-txt"><span class="brand-name">Googwi</span><span class="brand-tag">GADGET SHOP</span></span>
+    <span class="brand-txt"><span class="brand-name">Googwi</span></span>
   </a>
   <form class="hsearch" onsubmit="event.preventDefault();goSearchResults();" role="search">
     <input type="search" id="search-input" placeholder="পণ্য খুঁজুন..." oninput="renderProducts()" enterkeyhint="search" aria-label="পণ্য খুঁজুন">
@@ -519,7 +519,7 @@ footer{background:#fff;border-top:1px solid var(--border);margin-top:40px;paddin
     <div>
       <a class="brand" href="./" id="footer-logo" aria-label="Googwi">
         <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#FF4A00" stroke-linecap="round"><path d="M73 30.7A30 30 0 1 0 80 50" stroke-width="18"/><path d="M80 51H52" stroke-width="14"/><path d="M53 46L49 36" stroke-width="10"/></g></svg>
-        <span class="brand-txt"><span class="brand-name">Googwi</span><span class="brand-tag">GADGET SHOP</span></span>
+        <span class="brand-txt"><span class="brand-name">Googwi</span></span>
       </a>
       <p class="ftr-about">Googwi — আপনার নিত্য প্রয়োজনীয় গ্যাজেট আইটেমের বিশ্বস্ত অনলাইন শপ। সারা বাংলাদেশে ক্যাশ অন ডেলিভারি, পণ্য হাতে পেয়ে টাকা পরিশোধ।</p>
       <div class="ftr-line" id="f-addr-row" style="display:none;">📍 <span id="f-addr"></span></div>
@@ -539,7 +539,7 @@ footer{background:#fff;border-top:1px solid var(--border);margin-top:40px;paddin
         <li><a href="tel:01343804186" class="js-call">📞 কল করে অর্ডার</a></li>
         <li><a href="https://wa.me/8801350546228" class="js-wa" target="_blank" rel="noopener">💬 WhatsApp-এ অর্ডার</a></li>
         <li><a href="mailto:googwi50@gmail.com" class="js-mail">✉️ Email করুন</a></li>
-        <li>🕐 সকাল ৯টা — রাত ১১টা</li>
+        <li>🕐 সবসময় খোলা — 24/7</li>
       </ul>
     </div>
     <div>
@@ -963,7 +963,7 @@ function renderHeroSide(){
   const ph=callNumber();
   box.innerHTML=`<div class="hs-promo">
     <div>
-      <div class="hsp-top"><div class="hsp-mark">${gMark('')}</div><div><div class="hsp-eyebrow">Gadget Shop</div><div class="hsp-name">Googwi</div></div></div>
+      <div class="hsp-top"><div class="hsp-mark">${gMark('')}</div><div><div class="hsp-name">Googwi</div></div></div>
       <div class="hsp-title">নিত্য প্রয়োজনীয় সব গ্যাজেট — এক জায়গায়</div>
       <ul class="hsp-perks">
         <li><span>✓</span>100% অরিজিনাল প্রোডাক্ট</li>
