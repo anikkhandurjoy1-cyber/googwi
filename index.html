@@ -1035,7 +1035,7 @@ function applyLogo(){
   const fav = document.getElementById('site-favicon');
   if(fav){
     if(DEFAULT_FAVICON===null) DEFAULT_FAVICON = fav.href;
-    fav.href = url ? cld(url,64) : DEFAULT_FAVICON;
+    fav.href = DEFAULT_FAVICON; // browser tab always shows the square G icon (a wide uploaded logo would look squashed)
   }
 }
 function syncOrderLogo(){
