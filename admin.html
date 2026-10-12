@@ -33,7 +33,7 @@ button,a,label,.ni,.stab,.sni,.sc{-webkit-tap-highlight-color:transparent;touch-
 .login-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px 32px;width:100%;max-width:380px;text-align:center;box-shadow:0 30px 60px -30px rgba(255,74,0,.4);}
 .login-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:24px;}
 .logo-mark{width:46px;height:46px;flex-shrink:0;display:block;}
-.logo-img{height:40px;max-width:170px;object-fit:contain;display:block;}
+.logo-img{height:52px;width:auto;max-width:190px;object-fit:contain;display:block;}
 .logo-text{display:flex;flex-direction:column;line-height:1;text-align:left;}
 .logo-metro{font-family:'Poppins',sans-serif;font-weight:800;font-size:23px;letter-spacing:-.6px;line-height:1;color:var(--primary);}
 .logo-bd{font-family:'Poppins',sans-serif;font-size:8px;color:var(--primary);letter-spacing:2.6px;font-weight:700;margin-top:3px;}
@@ -2512,7 +2512,7 @@ function applyAdminLogo(){
   const sb = document.getElementById('sb-logo');
   if(!sb) return;
   sb.innerHTML = settings.logo_url
-    ? `<img class="logo-img" src="${cld(settings.logo_url,340)}" alt="${settings.sitename||'Googwi'}">`
+    ? `<img class="logo-img" src="${cld(settings.logo_url,700)}" alt="${settings.sitename||'Googwi'}">`
     : DEFAULT_SB_LOGO_HTML;
 }
 
