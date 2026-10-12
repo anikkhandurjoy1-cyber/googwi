@@ -51,7 +51,8 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .brand-name{font-family:var(--head);font-weight:800;font-size:25px;letter-spacing:-.6px;color:var(--primary);}
 .brand-name b{color:var(--primary);font-weight:800;}
 .brand-tag{font-family:var(--head);font-size:8.5px;font-weight:700;letter-spacing:2.6px;color:var(--primary);margin-top:3px;}
-.brand-img{height:42px;max-width:180px;object-fit:contain;display:block;}
+.brand-img{height:58px;width:auto;max-width:240px;object-fit:contain;display:block;}
+#footer-logo .brand-img{height:64px;max-width:260px;}
 .hsearch{flex:1;display:flex;align-items:center;background:#F4F1EC;border:1.5px solid transparent;border-radius:12px;max-width:620px;margin:0 auto;transition:border-color .2s,background .2s;}
 .hsearch:focus-within{border-color:var(--primary);background:#fff;}
 .hsearch input{flex:1;min-width:0;border:none;background:none;outline:none;padding:12px 16px;font-size:14.5px;font-family:'Hind Siliguri',sans-serif;color:var(--text);}
@@ -61,6 +62,7 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .hicon:hover{color:var(--primary);}
 .cart-count{position:absolute;top:-6px;right:-4px;background:var(--primary);color:#fff;min-width:18px;height:18px;padding:0 4px;border-radius:9px;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;}
 @media(max-width:899px){
+  .brand-img{height:48px;max-width:190px;}
   .hdr-in{gap:10px;}
   .hsearch{order:3;flex-basis:100%;max-width:none;}
   .hsearch input{padding:10px 14px;}
@@ -1026,7 +1028,7 @@ function applyLogo(){
     if(!el) return;
     if(DEFAULT_LOGO_HTML[id]===undefined) DEFAULT_LOGO_HTML[id] = el.innerHTML;
     if(url){
-      el.innerHTML = `<img class="brand-img" src="${cld(url,400)}" alt="${escAttr(alt)}" onerror="this.parentNode.innerHTML=DEFAULT_LOGO_HTML['${id}']">`;
+      el.innerHTML = `<img class="brand-img" src="${cld(url,800)}" alt="${escAttr(alt)}" onerror="this.parentNode.innerHTML=DEFAULT_LOGO_HTML['${id}']">`;
     } else {
       el.innerHTML = DEFAULT_LOGO_HTML[id];
     }
