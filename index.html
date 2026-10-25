@@ -626,6 +626,7 @@ footer{background:#fff;border-top:1px solid var(--border);margin-top:40px;paddin
       <div class="fg"><label>মোবাইল নম্বর *</label><input type="tel" id="o-phone" placeholder="01XXXXXXXXX"></div>
       <div class="fg"><label>সম্পূর্ণ ঠিকানা *</label><textarea id="o-address" placeholder="বাড়ি, রাস্তা, এলাকা, জেলা..."></textarea></div>
       <div class="fg"><label>বিশেষ মন্তব্য</label><input type="text" id="o-note" placeholder="কালার, মডেল বা ডেলিভারি সম্পর্কে..."></div>
+      <div style="position:absolute;left:-9999px;top:-9999px;height:0;overflow:hidden;" aria-hidden="true"><label>Website</label><input type="text" id="o-website" name="website" tabindex="-1" autocomplete="off"></div>
       <div style="margin-bottom:12px;" id="del-box"></div>
       <div class="order-summary-table" id="order-summ" style="display:none;">
         <div class="ost-row"><span>Product</span><span id="ost-p">—</span></div>
@@ -645,7 +646,7 @@ footer{background:#fff;border-top:1px solid var(--border);margin-top:40px;paddin
         </div>
       </div>
       <div class="order-limit-msg" id="order-limit-msg" style="display:none;"></div>
-      <button class="submit-btn" onclick="submitOrder()">✅ অর্ডার কনফার্ম করুন</button>
+      <button class="submit-btn" id="order-submit-btn" onclick="submitOrder()">✅ অর্ডার কনফার্ম করুন</button>
     </div>
     <div class="success-wrap" id="order-success" style="display:none;">
       <div class="otb-brand js-order-logo"></div>
@@ -696,8 +697,8 @@ const firebaseConfig = {
   appId: "1:18800909965:web:93cc19716c25a53d858cc4"
 };
 const FIREBASE_READY = !String(firebaseConfig.apiKey).startsWith('PASTE');
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const shopApp = firebase.initializeApp(firebaseConfig, 'shop');
+const db = shopApp.firestore();
 db.settings({ experimentalAutoDetectLongPolling: true });
 
 const STORE_DOC = db.collection('googwi').doc('store');
@@ -707,6 +708,8 @@ const PRODUCTS_SNAPSHOT_DOC = db.collection('googwi').doc('products-snapshot');
 // One tiny doc per phone number (doc id = 01XXXXXXXXX) holding only the last order time —
 // lets the 1-order-per-hour check work without customers being able to read the orders list.
 const PHONE_LOCK_COL = db.collection('googwi_phone_locks');
+// Numbers the admin marked as fake (doc id = 01XXXXXXXXX). Readable one-by-one only, never as a list.
+const BLOCKED_COL = db.collection('googwi_blocked');
 
 // Shop contact defaults (admin Settings overrides: General → Phone / Email, Social → WhatsApp)
 const SHOP_PHONE = '01343804186';
@@ -1697,6 +1700,7 @@ function openOrderModal(docId){
   }
   draftOrderId = null;
   orderSubmitted = false;
+  orderOpenedAt = Date.now();
   clearTimeout(draftSaveTimer);
   document.getElementById('order-form-wrap').style.display='block';
   document.getElementById('order-success').style.display='none';
@@ -1771,7 +1775,48 @@ function saveDraftOrder(){
 const ORDER_GAP_MIN = 60;
 function normPhone(ph){
   const d=String(ph||'').replace(/\D/g,'');
+  if(d.length===10 && d.startsWith('1')) return '0'+d;     // 17XXXXXXXX → 017XXXXXXXX
   return d.length>=11 ? d.slice(-11) : d;
+}
+
+// ══════════════════════════════════
+// FAKE-ORDER FILTER — real Bangladeshi mobile number, real name, full address
+// ══════════════════════════════════
+let orderOpenedAt = 0;
+function isValidBdMobile(n){
+  if(!/^01[3-9]\d{8}$/.test(n)) return false;                 // GP/Robi/BL/Airtel/Teletalk: 013-019
+  if(/^01(\d)\1{7,}/.test(n)) return false;                    // 01111111111, 01777777777...
+  if(/(\d)\1{6,}/.test(n.slice(3))) return false;               // 0171 0000000
+  if(/0123456789|1234567890|9876543210/.test(n)) return false; // sequences
+  return true;
+}
+function orderFormError(name, phone, address){
+  const n = normPhone(phone);
+  if(!isValidBdMobile(n)) return 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন 017XXXXXXXX)';
+  const letters = (name.match(/[A-Za-z\u0980-\u09FF]/g)||[]).length;
+  if(name.length<3 || letters<3 || /\d{3,}/.test(name)) return 'আপনার পুরো নাম লিখুন';
+  const words = address.split(/[\s,।]+/).filter(w=>w.length>1);
+  if(address.length<12 || words.length<3) return 'পুরো ঠিকানা দিন — বাড়ি/রাস্তা, এলাকা, থানা, জেলা';
+  if(/(.)\1{5,}/.test(address) || /(.)\1{4,}/.test(name)) return 'সঠিক নাম ও ঠিকানা দিন';
+  return '';
+}
+function isBlockedPhone(n){
+  if(!/^\d{11}$/.test(n)) return Promise.resolve(false);
+  return BLOCKED_COL.doc(n).get().then(d=>d.exists).catch(()=>false);
+}
+function showBlockedMsg(){
+  const el=document.getElementById('order-limit-msg'); if(!el) return;
+  const ph=callNumber();
+  el.innerHTML=`⚠️ এই নম্বর থেকে অনলাইনে অর্ডার নেওয়া যাচ্ছে না। অর্ডার করতে সরাসরি কল করুন: <a href="tel:${ph}">${ph}</a>`;
+  el.style.display='block';
+}
+// bot filled the hidden field → pretend success, save nothing
+function fakeSuccess(phone){
+  orderSubmitted=true; clearTimeout(draftSaveTimer);
+  if(draftOrderId){ ORDERS_COL.doc(draftOrderId).delete().catch(()=>{}); draftOrderId=null; }
+  document.getElementById('order-form-wrap').style.display='none';
+  document.getElementById('order-success').style.display='block';
+  const sp=document.getElementById('success-phone'); if(sp) sp.textContent=phone;
 }
 function localLastOrderTs(n){
   try{ const m=JSON.parse(localStorage.getItem('gw_last_orders')||'{}'); return m[n]||0; }catch(e){ return 0; }
@@ -1802,6 +1847,51 @@ function showOrderLimit(mins){
   el.innerHTML=`⚠️ এই মোবাইল নম্বর থেকে গত ১ ঘণ্টার মধ্যে একটি অর্ডার করা হয়েছে। আবার অর্ডার করতে <b>${mins} মিনিট</b> পর চেষ্টা করুন।<br>জরুরি হলে কল করুন: <a href="tel:${ph}">${ph}</a>`;
   el.style.display='block';
 }
+// ══════════════════════════════════
+// SAME DEVICE / SAME INTERNET (IP) LIMIT — Admin → Settings → Fake Order সুরক্ষা
+// ══════════════════════════════════
+const IP_LOCK_COL = db.collection('googwi_ip_locks');
+function ipLimitHours(){
+  const h = parseFloat(settings.ip_limit_hours);
+  return isNaN(h) ? 24 : Math.max(0, h);
+}
+let _clientIp = null;
+function getClientIp(){
+  if(_clientIp!==null) return Promise.resolve(_clientIp);
+  const ctl = ('AbortController' in window) ? new AbortController() : null;
+  const t = setTimeout(()=>{ try{ ctl && ctl.abort(); }catch(e){} }, 2500);
+  return fetch('https://api.ipify.org?format=json', ctl?{signal:ctl.signal}:{})
+    .then(r=>r.json()).then(j=>{ _clientIp = String(j.ip||''); return _clientIp; })
+    .catch(()=>{ _clientIp=''; return ''; })
+    .finally(()=>clearTimeout(t));
+}
+function ipKey(ip){ return String(ip||'').replace(/[^0-9A-Za-z]/g,'_').slice(0,60); }
+function deviceOrIpLocked(){
+  const hrs = ipLimitHours();
+  if(!hrs) return Promise.resolve(false);
+  const gap = hrs*3600000, now = Date.now();
+  let devTs = 0; try{ devTs = parseInt(localStorage.getItem('gw_last_any_order')||'0',10)||0; }catch(e){}
+  if(devTs && now-devTs < gap) return Promise.resolve(true);
+  return getClientIp().then(ip=>{
+    if(!ip) return false;
+    return IP_LOCK_COL.doc(ipKey(ip)).get().then(d=>{
+      const t = d.exists && d.data().ts && d.data().ts.toMillis ? d.data().ts.toMillis() : 0;
+      return !!(t && now-t < gap);
+    }).catch(()=>false);
+  });
+}
+function lockDeviceAndIp(){
+  try{ localStorage.setItem('gw_last_any_order', String(Date.now())); }catch(e){}
+  if(!ipLimitHours() || !_clientIp) return;
+  IP_LOCK_COL.doc(ipKey(_clientIp)).set({ts:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+}
+function showIpLimitMsg(){
+  const el=document.getElementById('order-limit-msg'); if(!el) return;
+  const ph=callNumber(), h=ipLimitHours();
+  el.innerHTML=`⚠️ এই ডিভাইস / ইন্টারনেট থেকে গত ${h>=24&&h%24===0?(h/24)+' দিনে':h+' ঘণ্টায়'} একটি অর্ডার হয়েছে। আরেকটি অর্ডার করতে সরাসরি কল করুন: <a href="tel:${ph}">${ph}</a>`;
+  el.style.display='block';
+}
+
 let orderChecking=false;
 function submitOrder(){
   if(orderChecking) return;
@@ -1810,13 +1900,21 @@ function submitOrder(){
   const address=document.getElementById('o-address').value.trim();
   if(!name||!phone||!address){showToast('নাম, মোবাইল ও ঠিকানা দিন','#EF4444');return;}
   if(!FIREBASE_READY){showToast('দুঃখিত, এখন অর্ডার নেওয়া যাচ্ছে না — কল করুন','#EF4444');return;}
-  const btn=document.querySelector('.submit-btn');
+  const hp=document.getElementById('o-website');
+  if(hp && hp.value.trim()){ fakeSuccess(phone); return; }
+  if(orderOpenedAt && Date.now()-orderOpenedAt < 3000){ showToast('তথ্যগুলো একবার মিলিয়ে নিয়ে আবার চাপুন','#EF4444'); return; }
+  const err=orderFormError(name, phone, address);
+  if(err){ showToast(err,'#EF4444'); return; }
+  document.getElementById('o-phone').value=normPhone(phone);
+  const btn=document.getElementById('order-submit-btn');
   const label=btn?btn.textContent:'';
   if(btn){btn.textContent='⏳ যাচাই হচ্ছে...';btn.disabled=true;}
   orderChecking=true;
-  recentOrderWait(phone).then(mins=>{
+  Promise.all([recentOrderWait(phone), isBlockedPhone(normPhone(phone)), deviceOrIpLocked()]).then(([mins,blocked,ipLocked])=>{
     orderChecking=false;
     if(btn){btn.textContent=label||'✅ অর্ডার কনফার্ম করুন';btn.disabled=false;}
+    if(blocked){ showBlockedMsg(); return; }
+    if(ipLocked){ showIpLimitMsg(); return; }
     showOrderLimit(mins);
     if(mins>0){ showToast('১ ঘণ্টার মধ্যে আবার অর্ডার করা যাবে না','#EF4444'); return; }
     submitOrderNow();
@@ -1825,7 +1923,7 @@ function submitOrder(){
 
 function submitOrderNow(){
   const name=document.getElementById('o-name').value.trim();
-  const phone=document.getElementById('o-phone').value.trim();
+  const phone=normPhone(document.getElementById('o-phone').value.trim());
   const address=document.getElementById('o-address').value.trim();
   if(!name||!phone||!address){showToast('নাম, মোবাইল ও ঠিকানা দিন','#EF4444');return;}
   const p=curProd;
@@ -1842,9 +1940,10 @@ function submitOrderNow(){
     date:localDate(now),time:now.toLocaleTimeString(),
     createdAtTs:firebase.firestore.Timestamp.now(),
     createdAt:now.toISOString(),
-    isNew:true
+    isNew:true,
+    ip:_clientIp||''
   };
-  const btn=document.querySelector('.submit-btn');
+  const btn=document.getElementById('order-submit-btn');
   if(btn){btn.textContent='⏳ অপেক্ষা করুন...';btn.disabled=true;}
 
   function onSuccess(){
@@ -1853,6 +1952,7 @@ function submitOrderNow(){
     const sp=document.getElementById('success-phone');if(sp)sp.textContent=phone;
     rememberOrderTs(normPhone(phone));
     lockPhoneServer(normPhone(phone));
+    lockDeviceAndIp();
     firePurchaseEvent(order.total, order.qty);
     curProd=null;curQty=1;draftOrderId=null;
     if(btn){btn.textContent='✅ অর্ডার কনফার্ম করুন';btn.disabled=false;}

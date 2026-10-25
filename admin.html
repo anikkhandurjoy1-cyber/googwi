@@ -518,7 +518,7 @@ tr:hover td{background:rgba(0,0,0,0.02);}
       <div class="sni" onclick="sst('invoice',this)">Invoice</div>
       <div class="sni" onclick="sst('social',this)">Social Links</div>
       <div class="sni" onclick="sst('analytics',this)">Analytics/Pixel</div>
-      <div class="sni" onclick="sst('blacklist',this)">Blacklist</div>
+      <div class="sni" onclick="sst('blacklist',this)">🛡️ Fake Order সুরক্ষা</div>
       <div class="sni" onclick="sst('password',this)">Change Password</div>
       <div class="sni" onclick="sst('snapshot',this)">🔄 Fast-Load Snapshot</div>
     </div>
@@ -610,11 +610,24 @@ tr:hover td{background:rgba(0,0,0,0.02);}
         <button class="btn btn-p" onclick="saveS('analytics')">✅ Save</button>
       </div>
       <div class="sc2" id="st-blacklist" style="display:none;">
-        <div class="ss-title">Blacklist</div>
-        <div class="fg"><label>IP Black List</label><textarea id="s-ibl" placeholder="43.255.20.20,103.102..."></textarea></div>
-        <div class="fg"><label>Phone Black List</label><textarea id="s-pbl" placeholder="01XXXXXXXXX,..."></textarea></div>
-        <div class="fg"><label>Single Order Mode</label><select id="s-so"><option value="inactive">Inactive</option><option value="active">Active</option></select></div>
-        <button class="btn btn-p" onclick="saveS('blacklist')">✅ Save</button>
+        <div class="ss-title">🛡️ Fake Order সুরক্ষা</div>
+        <div class="fg">
+          <label>🌐 একই ডিভাইস / ইন্টারনেট (IP) থেকে আবার অর্ডার করতে কত ঘণ্টা অপেক্ষা</label>
+          <input type="number" id="s-iph" min="0" step="1" placeholder="24">
+          <div style="font-size:11.5px;color:var(--muted);line-height:1.7;margin-top:5px;">
+            24 = একদিনে একটা, 0 = বন্ধ। ⚠️ মোবাইল ডাটায় (GP/Robi) অনেক মানুষ একই IP শেয়ার করে, তাই বেশি ঘণ্টা দিলে কখনো আসল customer-ও আটকে যেতে পারে।
+          </div>
+        </div>
+        <button class="btn btn-p" onclick="saveProtection()" style="margin-bottom:18px;">✅ Save সুরক্ষা</button>
+        <div class="divider"></div>
+        <div class="ss-title">🚫 Fake নম্বর Blacklist</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:12px;">
+          এই তালিকার নম্বর থেকে website-এ আর অর্ডার দেওয়া যাবে না — customer-কে কল করতে বলা হবে।<br>
+          অর্ডার লিস্টে <b>🚫 Fake</b> বাটন চাপলে নম্বর আপনাআপনি এখানে যোগ হয়। হাতে যোগ/বাদ দিতে চাইলে প্রতি লাইনে একটা নম্বর লিখে Save করুন।<br>
+          🔒 এই তালিকা শুধু admin দেখতে পায়।
+        </div>
+        <div class="fg"><label>Blocked নম্বর (<span id="bl-count">0</span>টা)</label><textarea id="s-pbl" style="min-height:180px;font-family:monospace;" placeholder="01XXXXXXXXX&#10;01XXXXXXXXX"></textarea></div>
+        <button class="btn btn-p" onclick="saveBlacklist()" id="bl-save-btn">✅ Save</button>
       </div>
       <div class="sc2" id="st-password" style="display:none;">
         <div class="ss-title">Change Password</div>
@@ -874,6 +887,9 @@ try{
 const STORE_DOC = db.collection('googwi').doc('store');
 const ORDERS_COL = db.collection('googwi_orders');
 const PRODUCTS_COL = db.collection('googwi_products');
+// Fake-number blacklist: one admin-only list doc + one tiny doc per blocked number the shop checks at checkout
+const BLACKLIST_DOC = db.collection('googwi').doc('blacklist');
+const BLOCKED_COL = db.collection('googwi_blocked');
 
 // ⚠️ Cloudinary (unsigned upload) — Googwi-র Cloudinary cloud name + unsigned preset বসান
 const CLOUDINARY_CLOUD_NAME = "q08d93dr";
@@ -991,7 +1007,12 @@ let newOrderSound=null;
 let phoneOrderCountCache = {};
 
 function getPhoneCount(phone){
-  return phoneOrderCountCache[(phone||'').trim()] || 0;
+  const c = phoneOrderCountCache[(phone||'').trim()];
+  return c ? c.total : 0;
+}
+function getPhoneCanceled(phone){
+  const c = phoneOrderCountCache[(phone||'').trim()];
+  return c ? c.canceled : 0;
 }
 
 function annotateOldCustomers(){
@@ -1004,7 +1025,10 @@ function annotateOldCustomers(){
   if(!toFetch.length) return;
   Promise.all(toFetch.map(p=>
     ORDERS_COL.where('phone','==',p).limit(10).get()
-      .then(snap=>{ phoneOrderCountCache[p] = snap.docs.filter(d=>d.data().status!=='Incomplete').length; })
+      .then(snap=>{
+        const real = snap.docs.map(d=>d.data()).filter(o=>o.status!=='Incomplete');
+        phoneOrderCountCache[p] = {total: real.length, canceled: real.filter(o=>o.status==='Canceled'||o.fake).length};
+      })
       .catch(()=>{ phoneOrderCountCache[p] = null; })
   )).then(()=>{
     const active=document.querySelector('.page.active');
@@ -1015,8 +1039,85 @@ function annotateOldCustomers(){
 }
 
 function oldCustBadge(phone){
-  const n = getPhoneCount(phone);
-  return n>1 ? ` <span class="old-cust" title="এই নম্বর দিয়ে মোট ${n} টা অর্ডার আছে">🔁 পুরাতন (${n})</span>` : '';
+  const n = getPhoneCount(phone), c = getPhoneCanceled(phone);
+  let h = n>1 ? ` <span class="old-cust" title="এই নম্বর দিয়ে মোট ${n} টা অর্ডার আছে">🔁 পুরাতন (${n})</span>` : '';
+  if(c>0) h += ` <span class="old-cust" style="background:rgba(239,68,68,.15);color:#DC2626;" title="এই নম্বরের ${c} টা অর্ডার বাতিল/fake হয়েছে — সাবধান">⚠️ বাতিল ${c}</span>`;
+  if(isBlacklisted(phone)) h += ` <span class="old-cust" style="background:#DC2626;color:#fff;">🚫 Blocked</span>`;
+  return h;
+}
+
+// ══════════════════════════════════════════
+// FAKE ORDER / BLACKLIST
+// ══════════════════════════════════════════
+let blacklist = [];
+function normPhone(ph){
+  const d=String(ph||'').replace(/\D/g,'');
+  if(d.length===10 && d.startsWith('1')) return '0'+d;
+  return d.length>=11 ? d.slice(-11) : d;
+}
+function isBlacklisted(phone){ const n=normPhone(phone); return n.length===11 && blacklist.includes(n); }
+function loadBlacklist(){
+  return BLACKLIST_DOC.get().then(doc=>{
+    blacklist = (doc.exists && Array.isArray(doc.data().phones)) ? doc.data().phones : [];
+    // one-time move: an old list kept in public settings goes into the private list
+    if(settings.phone_blacklist){
+      const old = String(settings.phone_blacklist).split(/[\s,;]+/).map(normPhone).filter(n=>/^\d{11}$/.test(n));
+      delete settings.phone_blacklist;
+      saveAll().catch(()=>{});
+      if(old.length) return writeBlacklist([...new Set(blacklist.concat(old))]);
+    }
+  }).catch(err=>console.warn('Blacklist load failed:',err&&err.message));
+}
+// saves the list and keeps one googwi_blocked/{number} doc per number in sync
+function writeBlacklist(list){
+  const next = [...new Set(list)].sort();
+  const added = next.filter(n=>!blacklist.includes(n));
+  const removed = blacklist.filter(n=>!next.includes(n));
+  const ops = [BLACKLIST_DOC.set({phones: next, updatedAt: firebase.firestore.Timestamp.now()})];
+  added.forEach(n=>ops.push(BLOCKED_COL.doc(n).set({at: firebase.firestore.Timestamp.now()})));
+  removed.forEach(n=>ops.push(BLOCKED_COL.doc(n).delete()));
+  return Promise.all(ops).then(()=>{ blacklist = next; return {added: added.length, removed: removed.length}; });
+}
+function saveProtection(){
+  settings.otp_on = false;
+  const h = parseFloat(document.getElementById('s-iph').value);
+  settings.ip_limit_hours = isNaN(h) ? 24 : Math.max(0, h);
+  saveAll().then(()=>toast('সুরক্ষা settings saved ✅')).catch(()=>{});
+}
+function renderBlacklistBox(){
+  const ta=document.getElementById('s-pbl'); if(ta) ta.value = blacklist.join('\n');
+  const c=document.getElementById('bl-count'); if(c) c.textContent = blacklist.length;
+}
+function saveBlacklist(){
+  const raw = document.getElementById('s-pbl').value;
+  const toks = raw.split(/[\s,;]+/).filter(Boolean);
+  const nums = toks.map(normPhone).filter(n=>/^01\d{9}$/.test(n));
+  const bad = toks.length - nums.length;
+  const btn=document.getElementById('bl-save-btn'); if(btn){btn.disabled=true;btn.textContent='⏳ Saving...';}
+  writeBlacklist(nums).then(r=>{
+    renderBlacklistBox();
+    toast(`Blacklist saved ✅ (+${r.added} / -${r.removed})`+(bad?` — ${bad}টা ভুল নম্বর বাদ দেওয়া হয়েছে`:''));
+  }).catch(err=>{ console.error(err); toast('Blacklist save হয়নি — Firestore Rules চেক করুন','var(--red)'); })
+    .finally(()=>{ if(btn){btn.disabled=false;btn.textContent='✅ Save';} });
+}
+// Order row button: cancel as fake + block the number
+function markFake(docId){
+  const o = findOrderAnywhere(docId); if(!o) return;
+  const n = normPhone(o.phone);
+  const valid = /^01\d{9}$/.test(n);
+  if(!confirm(`এই অর্ডার Fake হিসেবে বাতিল করবেন?${valid?`\n\n${n} নম্বরটি blacklist হবে — এই নম্বর থেকে আর অর্ডার দেওয়া যাবে না।`:''}`)) return;
+  const jobs=[ORDERS_COL.doc(docId).update({status:'Canceled', fake:true})];
+  if(valid && !blacklist.includes(n)) jobs.push(writeBlacklist(blacklist.concat(n)));
+  Promise.all(jobs).then(()=>{
+    o.status='Canceled'; o.fake=true;
+    incompleteOrdersCache = incompleteOrdersCache.filter(x=>x._docId!==docId);
+    const key=(o.phone||'').trim();
+    if(phoneOrderCountCache[key]) phoneOrderCountCache[key].canceled++;
+    const active=document.querySelector('.page.active');
+    const pid = active ? active.id.replace('pg-','') : '';
+    if(pid==='incomplete') renderIncomplete(); else renderOrders();
+    toast('Fake হিসেবে বাতিল + নম্বর blocked 🚫');
+  }).catch(err=>{ console.error(err); toast('করা যায়নি — ইন্টারনেট / Rules চেক করুন','var(--red)'); });
 }
 
 function startNewOrderWatcher(){
@@ -1177,6 +1278,7 @@ function enterAdminPanel(d){
   startNewOrderWatcher();
   document.getElementById('login-page').style.display='none';
   document.getElementById('admin-panel').style.display='block';
+  loadBlacklist();
   loadProducts().then(()=>{
     updateCourierSelects();
     loadDashboard();
@@ -1515,11 +1617,12 @@ function renderOrders(){
     <td style="color:var(--green);font-weight:700">৳${(o.total||0).toLocaleString()}</td>
     <td style="font-size:12px">${o.courier||'—'}</td>
     <td style="font-size:12px">${o.date||''}</td>
-    <td><span class="badge ${sc(o.status)}">${o.status}</span></td>
+    <td><span class="badge ${sc(o.status)}">${o.status}</span>${o.fake?'<div style="font-size:10px;color:var(--red);font-weight:700;margin-top:3px;">🚫 Fake</div>':''}</td>
     <td><div class="ci">
       <button class="btn btn-o btn-sm" onclick="viewOrder('${o._docId}')" title="View">👁️</button>
       <button class="btn btn-p btn-sm" onclick="openFullOrderEdit('${o._docId}')" title="Edit">✏️</button>
       <button class="btn btn-w btn-sm" onclick="openES('${o._docId}')" title="Status">↕️</button>
+      ${o.fake?'':`<button class="btn btn-o btn-sm" style="color:var(--red);border-color:rgba(220,38,38,.4)" onclick="markFake('${o._docId}')" title="Fake — বাতিল করে নম্বর block করুন">🚫</button>`}
       <button class="btn btn-d btn-sm" onclick="delOrder('${o._docId}')" title="Delete">🗑️</button>
     </div></td>
   </tr>`).join('');
@@ -1541,6 +1644,7 @@ function viewOrder(docId){
       <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">STATUS</div><span class="badge ${sc(o.status)}">${o.status}</span></div>
       <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">ADDRESS</div><div style="font-size:12px">${o.address||'-'}${o.city?`<br>${o.city}${o.zone?', '+o.zone:''}`:''}</div></div>
       <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">PAYMENT</div><div style="font-size:12px">${o.payment||'-'}</div></div>
+      <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">IP</div><div style="font-size:12px;font-family:monospace">${o.ip||'—'}</div></div>
       <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">COURIER</div><div style="font-size:12px">${o.courier||'—'}</div></div>
       <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">DATE</div><div style="font-size:12px">${o.date}</div></div>
     </div>
@@ -1893,6 +1997,7 @@ function renderIncomplete(search=''){
     <td><div class="ci">
       <button class="btn btn-p btn-sm" onclick="openFullOrderEdit('${o._docId}')" title="Edit">✏️</button>
       <button class="btn btn-w btn-sm" onclick="openESIncomplete('${o._docId}')">Status</button>
+      <button class="btn btn-o btn-sm" style="color:var(--red);border-color:rgba(220,38,38,.4)" onclick="markFake('${o._docId}')" title="Fake — মুছে নম্বর block করুন">🚫</button>
       <button class="btn btn-d btn-sm" onclick="delOrder('${o._docId}')" title="Delete">🗑️</button>
     </div></td>
   </tr>`).join('');
@@ -2688,7 +2793,8 @@ function loadSettings(){
   g('s-fb','fb'); g('s-tt','tiktok'); g('s-yt','yt'); g('s-ig','ig'); g('s-wa','wa');
   g('s-fbp','fbpixel'); g('s-tkp','tkpixel'); g('s-ga','ga');
   const cae=document.getElementById('cur-admin-email'); if(cae) cae.textContent=adminEmail;
-  g('s-ibl','ip_blacklist'); g('s-pbl','phone_blacklist'); g('s-so','single_order');
+  renderBlacklistBox(); loadBlacklist().then(renderBlacklistBox);
+  const si=document.getElementById('s-iph'); if(si) si.value = (settings.ip_limit_hours===undefined || settings.ip_limit_hours==='') ? 24 : settings.ip_limit_hours;
   renderLogoPreview();
 }
 
@@ -2700,8 +2806,7 @@ function saveS(tab){
     delivery:{dhaka_inside:'s-id',dhaka_inside_text:'s-idt',dhaka_outside:'s-od',dhaka_outside_text:'s-odt'},
     invoice:{invoice_prefix:'s-ip',invoice_perpage:'s-pp',invoice_info:'s-ii',invoice_note:'s-in'},
     social:{fb:'s-fb',tiktok:'s-tt',yt:'s-yt',ig:'s-ig',wa:'s-wa'},
-    analytics:{fbpixel:'s-fbp',tkpixel:'s-tkp',ga:'s-ga'},
-    blacklist:{ip_blacklist:'s-ibl',phone_blacklist:'s-pbl',single_order:'s-so'}
+    analytics:{fbpixel:'s-fbp',tkpixel:'s-tkp',ga:'s-ga'}
   };
   if(map[tab]) Object.entries(map[tab]).forEach(([k,id])=>settings[k]=g(id));
   saveAll().then(()=>toast('Settings saved! ✅')).catch(()=>{});
